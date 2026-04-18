@@ -212,58 +212,55 @@ function handleNoPose() {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  PULL-UP LOGIC (RESILIENT BAR CROSS)
+//  PULL-UP LOGIC (ANTI-CHEAT ROM)
 // ═══════════════════════════════════════════════════════════
 function analyze(pose) {
     const kps = pose.keypoints;
-    const MIN_CONF = 0.15; // Much more lenient for edge-of-screen tracking
+    const MIN_CONF = 0.15;
+    const ROM_THRESHOLD = 0.12; // Must drop 12% of screen below bar to reset
     
     const nose = kps[0];
     const lWr = kps[9], rWr = kps[10];
 
-    // Filter for visible keypoints
     const isOk = (k) => k && k.score > MIN_CONF;
     const okHands = [lWr, rWr].filter(isOk);
     const hasNose = isOk(nose);
 
-    // Guard: Need at least one hand and the nose to track
     if (okHands.length === 0 || !hasNose) {
         handleNoPose();
-        if (!hasNose) setBadge('NEED FACE', 'inactive');
-        else setBadge('NEED HANDS', 'inactive');
         return;
     }
 
     const h = canvas.height;
-    
-    // BAR LOGIC: 
-    // Use the HIGHEST visible hand as the bar. 
-    // This handles both-hands-up AND one-hand-off-screen scenarios.
     const highestHandY = Math.min(...okHands.map(k => k.y)) / h;
     const nNose = nose.y / h;
 
-    // ─── RESILIENT LOGIC ───
+    // ─── ROM CHECK ───
     const isAbove = nNose < highestHandY; 
-    const isBelow = nNose > highestHandY + 0.04; // Added small buffer for stability
+    const isFullReset = nNose > highestHandY + ROM_THRESHOLD; 
+    const isPartialBelow = nNose > highestHandY + 0.02;
 
     // ─── Debug ───
     updateDebug({
-        state: okHands.length === 2 ? 'DUAL TRACK' : 'SINGLE FALLBACK',
+        state: 'ANTI-CHEAT ON',
         wrist: Math.round(highestHandY * h) + 'px',
         chin: Math.round(nNose * h) + 'px',
-        phase: isAbove ? 'TOP' : 'BOTTOM',
+        phase: isAbove ? 'TOP' : (isFullReset ? 'FULL HANG' : 'SHORT ROM'),
         conf: Math.round(nose.score * 100) + '%'
     });
 
-    // ─── FSM ───
-    if (currentState === PS.NONE || currentState === PS.UP) {
-        if (isBelow) {
+    // ─── ANTI-CHEAT FSM ───
+    
+    // Step 1: Initialize / Full Reset (Must go deep)
+    if (currentState === PS.NONE || currentState === PS.UP || currentState === PS.TOP) {
+        if (isFullReset) {
             currentState = PS.HANGING;
             completedTop = false;
-            setBadge('READY: BELOW BAR', 'active');
+            setBadge('READY: FULL HANG', 'active');
         }
     }
 
+    // Step 2: Going Up
     if (currentState === PS.HANGING) {
         if (isAbove) {
             playAudio('top'); 
@@ -273,12 +270,20 @@ function analyze(pose) {
         }
     }
 
+    // Step 3: Anti-Cheat Guard
     if (currentState === PS.TOP) {
-        if (isBelow && completedTop) {
+        if (isPartialBelow && !isFullReset) {
+            // User dropped slightly but didn't finish ROM
+            setBadge('DROP LOWER ↓', 'active');
+            // We stay in TOP state internally so they can't spam
+        }
+        
+        if (isFullReset && completedTop) {
+            // Success! Full range of motion detected
             completeRep(); 
             currentState = PS.HANGING;
             completedTop = false;
-            setBadge('READY: BELOW BAR', 'active');
+            setBadge('READY: FULL HANG', 'active');
         }
     }
 }
