@@ -172,7 +172,7 @@ function handleNoPose() {
 function analyze(pose) {
     const kps = pose.keypoints;
     const MIN_CONF = 0.20;
-    const ROM_THRESHOLD = 0.12; 
+    const ROM_THRESHOLD = 0.07; // Reduced from 0.12 for better sensitivity
     
     const nose = kps[0];
     const lSh = kps[5], rSh = kps[6];
