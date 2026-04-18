@@ -194,7 +194,8 @@ function analyze(pose) {
     const nNose = nose.y / h;
 
     // Anatomical Check: Wrists must be near or above shoulders
-    const isHangingPos = highestHandY < avgShoulderY + 0.02; // More lenient
+    // Increased buffer to 0.30 to handle steep camera angles or close-ups
+    const isHangingPos = highestHandY < avgShoulderY + 0.30; 
     
     const isAbove = nNose < highestHandY; 
     const isFullReset = nNose > highestHandY + ROM_THRESHOLD; 
@@ -209,11 +210,14 @@ function analyze(pose) {
     });
 
     if (!isHangingPos) {
-        if (currentState !== PS.NONE) {
+        // Only reset if hands are REALLY low (like at the waist)
+        if (currentState !== PS.NONE && highestHandY > 0.7) { 
             currentState = PS.NONE;
             completedTop = false;
             setBadge('HANDS TOO LOW', 'inactive');
         }
+        // If they are just slightly low, we stay in the last state but warn them
+        if (highestHandY > 0.6) setBadge('RAISE HANDS HIGHER', 'inactive');
         return;
     }
 
