@@ -171,34 +171,45 @@ function handleNoPose() {
 // ═══════════════════════════════════════════════════════════
 function analyze(pose) {
     const kps = pose.keypoints;
-    const MIN_CONF = 0.15; 
+    const MIN_CONF = 0.10; 
     
     const nose = kps[0];
     const lWr = kps[9], rWr = kps[10];
+    const lSh = kps[5], rSh = kps[6];
 
     const isOk = (k) => k && k.score > MIN_CONF;
     const okHands = [lWr, rWr].filter(isOk);
+    const okShoulders = [lSh, rSh].filter(isOk);
     const hasNose = isOk(nose);
 
-    // Only need nose and at least one hand
-    if (okHands.length === 0 || !hasNose) {
+    // Only need nose and at least one hand (or shoulder as fallback)
+    if (!hasNose || (okHands.length === 0 && okShoulders.length === 0)) {
         handleNoPose();
         return;
     }
 
     const h = canvas.height;
-    // Use the highest visible hand as the bar level
-    const highestHandY = Math.min(...okHands.map(k => k.y)) / h;
+    // Use highest hand, or shoulders if hands lost
+    let barRefY;
+    if (okHands.length > 0) {
+        barRefY = Math.min(...okHands.map(k => k.y)) / h;
+    } else {
+        // If hands are too high and lost, use shoulders + offset
+        barRefY = (Math.min(...okShoulders.map(k => k.y)) / h) - 0.1;
+    }
+
     const nNose = nose.y / h;
 
-    const isAbove = nNose < highestHandY; 
-    const isBelow = nNose > highestHandY + 0.02; // Small buffer for stability
+    // Head is near or above the bar level
+    const isAbove = nNose < (barRefY + 0.06); 
+    // Head is significantly below the bar
+    const isBelow = nNose > (barRefY + 0.15); 
 
     updateDebug({
-        state: 'SIMPLE TRACKING',
-        wrist: Math.round(highestHandY * h) + 'px',
+        state: 'ROBUST TRACKING',
+        wrist: Math.round(barRefY * h) + 'px',
         chin: Math.round(nNose * h) + 'px',
-        phase: isAbove ? 'TOP' : 'BOTTOM',
+        phase: isAbove ? 'TOP' : (isBelow ? 'BOTTOM' : 'MID'),
         conf: Math.round(nose.score * 100) + '%'
     });
 
@@ -229,6 +240,28 @@ function analyze(pose) {
             completedTop = false;
             setBadge('READY: BELOW BAR', 'active');
         }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  RESET & CLEAR
+// ═══════════════════════════════════════════════════════════
+function resetAll() {
+    count = 0;
+    saveSession();
+    updateDisplay();
+    if (logList) logList.innerHTML = '';
+    currentState = PS.NONE;
+    completedTop = false;
+    setBadge('SESSION RESET', 'inactive');
+}
+
+function clearAllData() {
+    if (confirm("Clear ALL session data, storage, and reset tutorial? \n\nNOTE: To reset camera permissions, you must also click the 'Lock' icon in your browser address bar and select 'Reset Permission'.")) {
+        localStorage.clear();
+        sessionStorage.clear();
+        alert("Memory cleared! Page will reload.");
+        window.location.reload();
     }
 }
 
