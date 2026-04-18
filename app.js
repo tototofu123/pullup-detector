@@ -212,105 +212,75 @@ function handleNoPose() {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  PULL-UP LOGIC (FSM)
+//  PULL-UP LOGIC (STRICT BAR CROSS)
 // ═══════════════════════════════════════════════════════════
 function analyze(pose) {
     const kps = pose.keypoints;
-    const MIN_CONF = 0.30;
+    const MIN_CONF = 0.35; // Stricter for accuracy
     
-    // Keypoints
     const nose = kps[0];
-    const lSh = kps[5], rSh = kps[6];
-    const lEl = kps[7], rEl = kps[8];
     const lWr = kps[9], rWr = kps[10];
 
-    const getOk = (arr) => arr.filter(k => k && k.score > MIN_CONF);
-    const wrists = getOk([lWr, rWr]);
-    const shoulders = getOk([lSh, rSh]);
-    const elbows = getOk([lEl, rEl]);
+    // REQUIRE both hands and nose for strict tracking
+    const bothHandsVisible = lWr && rWr && lWr.score > MIN_CONF && rWr.score > MIN_CONF;
+    const noseVisible = nose && nose.score > MIN_CONF;
 
-    // Guard: Must see wrists and shoulders to track anything
-    if (!wrists.length || !shoulders.length) {
+    if (!bothHandsVisible || !noseVisible) {
         handleNoPose();
+        setBadge('NEED BOTH HANDS', 'inactive');
         return;
     }
 
     const h = canvas.height;
-    const getAvgY = (arr) => arr.reduce((s, k) => s + k.y, 0) / arr.length / h;
+    // Find the HIGHER hand (the one with the smallest Y value)
+    // This is our "Bar Line"
+    const highestHandY = Math.min(lWr.y, rWr.y) / h;
+    const nNose = nose.y / h;
 
-    const nWrist = getAvgY(wrists);
-    const nShoulder = getAvgY(shoulders);
-    const nElbow = elbows.length ? getAvgY(elbows) : nShoulder;
-    const nNose = (nose && nose.score > MIN_CONF) ? nose.y / h : nShoulder;
-
-    // ─── Metrics ───
-    // 1. Are wrists above shoulders? (Always true for hanging/pulling)
-    const wristsAboveShoulders = nWrist < nShoulder;
-    // 2. Are arms straight? (Elbows near shoulder height)
-    const armsStraight = nElbow < nShoulder + 0.05;
-    // 3. Is the chin/nose at or above the bar?
-    const chinAtBar = nNose < nWrist + 0.05;
-    // 4. Is the subject clearly hanging/pulling? (Vertical alignment)
-    const isVertical = Math.abs(nWrist - nShoulder) > 0.02;
+    // ─── STRICT LOGIC ───
+    // Chin must go above the highest hand
+    const isAbove = nNose < highestHandY; 
+    // Chin must drop clearly below the highest hand to reset
+    const isBelow = nNose > highestHandY + 0.03; 
 
     // ─── Debug ───
-    let phase = 'IDLE';
-    if (chinAtBar) phase = 'TOP';
-    else if (nElbow > nShoulder + 0.05) phase = 'PULLING';
-    else if (wristsAboveShoulders && armsStraight) phase = 'HANGING';
-
     updateDebug({
-        state: isVertical ? 'ACTIVE' : 'WAITING',
-        wrist: Math.round(nWrist * h) + 'px',
+        state: 'STRICT TRACKING',
+        wrist: Math.round(highestHandY * h) + 'px',
         chin: Math.round(nNose * h) + 'px',
-        phase: phase,
-        conf: Math.round(wrists[0].score * 100) + '%'
+        phase: isAbove ? 'TOP' : 'BOTTOM',
+        conf: Math.round(Math.min(lWr.score, rWr.score, nose.score) * 100) + '%'
     });
 
-    // ─── FSM (Finite State Machine) ───
+    // ─── STRICT FSM ───
     
-    // Step 0: Initial/Idle -> Hanging
+    // Step 1: Initialize at the bottom
     if (currentState === PS.NONE || currentState === PS.UP) {
-        if (wristsAboveShoulders && armsStraight && !chinAtBar) {
-            currentState = PS.HANGING;
-            setBadge('READY: HANGING', 'active');
-        }
-    }
-
-    // Step 1: Hanging -> Pulling Up
-    if (currentState === PS.HANGING) {
-        // We detect "Up" movement if elbows drop below shoulders or chin gets close to bar
-        if (nElbow > nShoulder + 0.04 || chinAtBar) {
-            currentState = PS.UP;
-            setBadge('PULLING UP ↑', 'active');
-        }
-    }
-
-    // Step 2: Pulling Up -> Reached Top
-    if (currentState === PS.UP) {
-        if (chinAtBar) {
-            if (!completedTop) {
-                playAudio('top');
-                completedTop = true;
-            }
-            setBadge('REACHED TOP ✓', 'top');
-        }
-        
-        // Step 3: Top -> Finish Rep (Return to Hanging)
-        // If we were at the top and now arms are straight/shoulders dropped
-        if (completedTop && armsStraight && !chinAtBar && nShoulder > nWrist + 0.1) {
-            completeRep();
+        if (isBelow) {
             currentState = PS.HANGING;
             completedTop = false;
-            setBadge('READY: HANGING', 'active');
+            setBadge('READY: BELOW BAR', 'active');
         }
     }
 
-    // Security: If we completely lose vertical alignment for a while, reset
-    if (!wristsAboveShoulders) {
-        currentState = PS.NONE;
-        completedTop = false;
-        setBadge('POSITIONING...', 'inactive');
+    // Step 2: Must cross the HIGHER hand line
+    if (currentState === PS.HANGING) {
+        if (isAbove) {
+            playAudio('top'); 
+            currentState = PS.TOP;
+            completedTop = true;
+            setBadge('REACHED TOP ✓', 'top');
+        }
+    }
+
+    // Step 3: Must drop back below the line to count
+    if (currentState === PS.TOP) {
+        if (isBelow && completedTop) {
+            completeRep(); 
+            currentState = PS.HANGING;
+            completedTop = false;
+            setBadge('READY: BELOW BAR', 'active');
+        }
     }
 }
 
