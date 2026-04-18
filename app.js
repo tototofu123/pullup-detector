@@ -15,6 +15,7 @@ let camLive = false;
 const PS = { NONE: 'NONE', HANGING: 'HANGING', TOP: 'TOP' };
 let currentState = PS.NONE;
 let completedTop = false;
+let lastRepTime = 0;
 
 const video = document.getElementById('video');
 const canvas = document.getElementById('canvas');
@@ -217,28 +218,20 @@ function analyze(pose) {
     if (currentState === PS.NONE || currentState === PS.TOP) {
         if (isBelow) {
             currentState = PS.HANGING;
-            completedTop = false;
             setBadge('READY: BELOW BAR', 'active');
         }
     }
 
-    // Step 2: REACHED TOP (Head crosses above bar)
+    // Step 2: COUNT AT TOP (Head crosses above bar)
     if (currentState === PS.HANGING) {
         if (isAbove) {
-            playAudio('top'); 
-            currentState = PS.TOP;
-            completedTop = true;
-            setBadge('REACHED TOP ✓', 'top');
-        }
-    }
-
-    // Step 3: COUNT (Head drops back below bar)
-    if (currentState === PS.TOP) {
-        if (isBelow && completedTop) {
-            completeRep(); 
-            currentState = PS.HANGING;
-            completedTop = false;
-            setBadge('READY: BELOW BAR', 'active');
+            const now = Date.now();
+            if (now - lastRepTime > 500) {
+                completeRep(); 
+                lastRepTime = now;
+                currentState = PS.TOP;
+                setBadge('REACHED TOP ✓', 'top');
+            }
         }
     }
 }
