@@ -212,46 +212,63 @@ function handleNoPose() {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  PULL-UP LOGIC (ANTI-CHEAT ROM)
+//  PULL-UP LOGIC (STRICT ANATOMICAL ANTI-CHEAT)
 // ═══════════════════════════════════════════════════════════
 function analyze(pose) {
     const kps = pose.keypoints;
-    const MIN_CONF = 0.15;
-    const ROM_THRESHOLD = 0.12; // Must drop 12% of screen below bar to reset
+    const MIN_CONF = 0.20;
+    const ROM_THRESHOLD = 0.12; 
     
     const nose = kps[0];
+    const lSh = kps[5], rSh = kps[6];
     const lWr = kps[9], rWr = kps[10];
 
     const isOk = (k) => k && k.score > MIN_CONF;
     const okHands = [lWr, rWr].filter(isOk);
+    const okShoulders = [lSh, rSh].filter(isOk);
     const hasNose = isOk(nose);
 
-    if (okHands.length === 0 || !hasNose) {
+    // REQUIRE: Nose, at least one hand, and at least one shoulder
+    if (okHands.length === 0 || okShoulders.length === 0 || !hasNose) {
         handleNoPose();
         return;
     }
 
     const h = canvas.height;
     const highestHandY = Math.min(...okHands.map(k => k.y)) / h;
+    const avgShoulderY = okShoulders.reduce((s, k) => s + k.y, 0) / okShoulders.length / h;
     const nNose = nose.y / h;
 
-    // ─── ROM CHECK ───
+    // ─── ANATOMICAL CHECK ───
+    // Real Pull-up: Wrists MUST be above shoulders (smaller Y is higher)
+    const isHangingPos = highestHandY < avgShoulderY - 0.05; 
+    
     const isAbove = nNose < highestHandY; 
     const isFullReset = nNose > highestHandY + ROM_THRESHOLD; 
     const isPartialBelow = nNose > highestHandY + 0.02;
 
     // ─── Debug ───
     updateDebug({
-        state: 'ANTI-CHEAT ON',
+        state: isHangingPos ? 'VALID POSE' : 'INVALID POSE',
         wrist: Math.round(highestHandY * h) + 'px',
         chin: Math.round(nNose * h) + 'px',
-        phase: isAbove ? 'TOP' : (isFullReset ? 'FULL HANG' : 'SHORT ROM'),
+        phase: !isHangingPos ? 'HANDS TOO LOW' : (isAbove ? 'TOP' : (isFullReset ? 'FULL HANG' : 'SHORT ROM')),
         conf: Math.round(nose.score * 100) + '%'
     });
 
-    // ─── ANTI-CHEAT FSM ───
+    // ─── STRICT ANTI-CHEAT FSM ───
     
-    // Step 1: Initialize / Full Reset (Must go deep)
+    // Safety: If hands are not above shoulders, you aren't doing a pull-up. RESET.
+    if (!isHangingPos) {
+        if (currentState !== PS.NONE) {
+            currentState = PS.NONE;
+            completedTop = false;
+            setBadge('HANDS TOO LOW', 'inactive');
+        }
+        return;
+    }
+
+    // Step 1: Initialize / Full Reset
     if (currentState === PS.NONE || currentState === PS.UP || currentState === PS.TOP) {
         if (isFullReset) {
             currentState = PS.HANGING;
@@ -270,16 +287,13 @@ function analyze(pose) {
         }
     }
 
-    // Step 3: Anti-Cheat Guard
+    // Step 3: Anti-Cheat ROM Guard
     if (currentState === PS.TOP) {
         if (isPartialBelow && !isFullReset) {
-            // User dropped slightly but didn't finish ROM
             setBadge('DROP LOWER ↓', 'active');
-            // We stay in TOP state internally so they can't spam
         }
         
         if (isFullReset && completedTop) {
-            // Success! Full range of motion detected
             completeRep(); 
             currentState = PS.HANGING;
             completedTop = false;
