@@ -100,11 +100,24 @@
             <div class="bento-card counter-card">
                 <div class="counter-label">Current Set</div>
                 <span class="counter-value" id="countDisplay">0</span>
-                <div class="counter-label" style="font-size: 10px; opacity: 0.5;">TOTAL REPS</div>
+                
+                <!-- Progress UI -->
+                <div class="progress-container">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="goalFill"></div>
+                    </div>
+                    <div class="goal-text">GOAL: <span id="goalValue">10</span></div>
+                </div>
             </div>
 
             <!-- Controls Bento Card -->
             <div class="bento-card">
+                <div class="card-title">SETTINGS</div>
+                <div class="settings-row" style="margin-bottom: 12px;">
+                    <div class="debug-label">REP GOAL</div>
+                    <input type="number" id="goalInput" value="10" min="1" max="100" class="goal-in" onchange="updateGoal()">
+                </div>
+
                 <div class="card-title">
                     <span>MODE SELECT</span>
                     <span id="txtMode" style="color: var(--accent);">AUTO</span>

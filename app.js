@@ -7,22 +7,15 @@
 //  STATE & CONFIG
 // ═══════════════════════════════════════════════════════════
 let count = 0;
-let sessionGoal = 10;
-let mode = 'auto'; // 'auto' | 'manual'
+let repGoal = 10;
+let mode = 'auto'; 
 let detector = null;
 let camLive = false;
 
-// Pull-up states
-const PS = {
-    NONE: 'NONE',
-    HANGING: 'HANGING',
-    UP: 'UP',
-    TOP: 'TOP'
-};
+const PS = { NONE: 'NONE', HANGING: 'HANGING', TOP: 'TOP' };
 let currentState = PS.NONE;
 let completedTop = false;
 
-// Elements
 const video = document.getElementById('video');
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
@@ -37,7 +30,6 @@ async function init() {
     loadSession();
     updateDisplay();
     
-    // Check for Secure Context (Required for Camera in most browsers)
     const splashText = document.querySelector('#splash p');
     const startBtn = document.querySelector('.btn-start');
 
@@ -49,11 +41,9 @@ async function init() {
             alert("Modern browsers only allow camera access on HTTPS or localhost.\n\nTo fix this:\n1. Use a local server (like VS Code 'Live Server').\n2. Or, drag this folder into a web host (Netlify/Vercel).\n3. Or, use Chrome with 'Allow insecure origins' flag.");
         };
     } else {
-        // Proactive Permission Check
         checkCameraPermission();
     }
 
-    // Show Tutorial if not dismissed
     if (!sessionStorage.getItem('pullup_tutorial_dismissed')) {
         setTimeout(() => {
             const tutorial = document.getElementById('tutorial');
@@ -64,23 +54,19 @@ async function init() {
     try {
         setLoad(10, 'Loading TensorFlow.js...');
         await tf.ready();
-        
         setLoad(40, 'Initializing MoveNet...');
         detector = await poseDetection.createDetector(
             poseDetection.SupportedModels.MoveNet,
             { modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING }
         );
-        
         setLoad(100, 'Ready!');
         dot('dotModel', 'on');
         txt('txtModel', 'MODEL READY');
-        
         setTimeout(() => {
             const el = document.getElementById('loading');
             el.style.opacity = '0';
             setTimeout(() => el.style.display = 'none', 500);
         }, 400);
-        
     } catch (e) {
         console.error('Init failed:', e);
         setLoad(0, 'Error: Could not load AI model.');
@@ -89,7 +75,6 @@ async function init() {
 
 async function checkCameraPermission() {
     if (!navigator.permissions || !navigator.permissions.query) return;
-    
     try {
         const result = await navigator.permissions.query({ name: 'camera' });
         handlePermissionChange(result.state);
@@ -102,7 +87,6 @@ async function checkCameraPermission() {
 function handlePermissionChange(state) {
     const splashText = document.querySelector('#splash p');
     const startBtn = document.querySelector('.btn-start');
-    
     if (state === 'denied') {
         splashText.textContent = 'CAMERA ACCESS BLOCKED. Please enable in browser settings.';
         splashText.style.color = 'var(--danger)';
@@ -129,50 +113,27 @@ function setLoad(pct, msg) {
 // ═══════════════════════════════════════════════════════════
 async function startCamera() {
     if (camLive) return;
-
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        alert("Camera API not available. This is likely due to the 'file://' security restriction mentioned on the screen.");
+        alert("Camera API not available.");
         return;
     }
-    
     const splashText = document.querySelector('#splash p');
     splashText.textContent = 'REQUESTING ACCESS...';
-    
     try {
         const stream = await navigator.mediaDevices.getUserMedia({
-            video: { 
-                facingMode: 'user', 
-                width: { ideal: 640 }, 
-                height: { ideal: 480 } 
-            }
+            video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }
         });
         video.srcObject = stream;
         await new Promise(r => video.onloadedmetadata = r);
         video.play();
         camLive = true;
-        
         document.getElementById('splash').style.display = 'none';
         dot('dotCam', 'on blink');
         txt('txtCam', 'CAM LIVE');
-        
         requestAnimationFrame(loop);
     } catch (e) {
         console.error('Camera error:', e);
-        
-        if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
-            splashText.textContent = 'PERMISSION DENIED. Please allow camera and try again.';
-            alert('Camera access denied. To count reps, the AI needs to see your movement.');
-        } else if (e.name === 'NotFoundError' || e.name === 'DevicesNotFoundError') {
-            splashText.textContent = 'NO CAMERA DETECTED.';
-            alert('No camera found on this device.');
-        } else if (e.name === 'NotReadableError' || e.name === 'TrackStartError') {
-            splashText.textContent = 'CAMERA IN USE BY ANOTHER APP.';
-            alert('Your camera is already being used by another application.');
-        } else {
-            splashText.textContent = 'CAMERA ERROR: ' + e.name;
-            alert('An unexpected error occurred while starting the camera.');
-        }
-        
+        splashText.textContent = 'CAMERA ERROR: ' + e.name;
         splashText.style.color = 'var(--danger)';
         splashText.style.opacity = '1';
     }
@@ -183,12 +144,9 @@ async function startCamera() {
 // ═══════════════════════════════════════════════════════════
 async function loop() {
     if (!detector || !camLive) return;
-
-    // Sync canvas size to video aspect ratio
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     ctx.drawImage(video, 0, 0);
-
     try {
         const poses = await detector.estimatePoses(video);
         if (poses && poses.length > 0) {
@@ -198,10 +156,7 @@ async function loop() {
         } else {
             handleNoPose();
         }
-    } catch (e) {
-        console.error('Detection error:', e);
-    }
-
+    } catch (e) { console.error(e); }
     requestAnimationFrame(loop);
 }
 
@@ -228,7 +183,6 @@ function analyze(pose) {
     const okShoulders = [lSh, rSh].filter(isOk);
     const hasNose = isOk(nose);
 
-    // REQUIRE: Nose, at least one hand, and at least one shoulder
     if (okHands.length === 0 || okShoulders.length === 0 || !hasNose) {
         handleNoPose();
         return;
@@ -239,15 +193,13 @@ function analyze(pose) {
     const avgShoulderY = okShoulders.reduce((s, k) => s + k.y, 0) / okShoulders.length / h;
     const nNose = nose.y / h;
 
-    // ─── ANATOMICAL CHECK ───
-    // Real Pull-up: Wrists MUST be above shoulders (smaller Y is higher)
-    const isHangingPos = highestHandY < avgShoulderY - 0.05; 
+    // Anatomical Check: Wrists must be near or above shoulders
+    const isHangingPos = highestHandY < avgShoulderY + 0.02; // More lenient
     
     const isAbove = nNose < highestHandY; 
     const isFullReset = nNose > highestHandY + ROM_THRESHOLD; 
     const isPartialBelow = nNose > highestHandY + 0.02;
 
-    // ─── Debug ───
     updateDebug({
         state: isHangingPos ? 'VALID POSE' : 'INVALID POSE',
         wrist: Math.round(highestHandY * h) + 'px',
@@ -256,9 +208,6 @@ function analyze(pose) {
         conf: Math.round(nose.score * 100) + '%'
     });
 
-    // ─── STRICT ANTI-CHEAT FSM ───
-    
-    // Safety: If hands are not above shoulders, you aren't doing a pull-up. RESET.
     if (!isHangingPos) {
         if (currentState !== PS.NONE) {
             currentState = PS.NONE;
@@ -268,7 +217,6 @@ function analyze(pose) {
         return;
     }
 
-    // Step 1: Initialize / Full Reset
     if (currentState === PS.NONE || currentState === PS.UP || currentState === PS.TOP) {
         if (isFullReset) {
             currentState = PS.HANGING;
@@ -277,7 +225,6 @@ function analyze(pose) {
         }
     }
 
-    // Step 2: Going Up
     if (currentState === PS.HANGING) {
         if (isAbove) {
             playAudio('top'); 
@@ -287,12 +234,10 @@ function analyze(pose) {
         }
     }
 
-    // Step 3: Anti-Cheat ROM Guard
     if (currentState === PS.TOP) {
         if (isPartialBelow && !isFullReset) {
             setBadge('DROP LOWER ↓', 'active');
         }
-        
         if (isFullReset && completedTop) {
             completeRep(); 
             currentState = PS.HANGING;
@@ -312,29 +257,31 @@ function completeRep() {
     playAudio('rep');
     triggerFlash();
     logEntry('AUTO');
+    checkGoal();
 }
 
-function addManual(n) {
-    count += n;
-    saveSession();
+function updateGoal() {
+    repGoal = parseInt(document.getElementById('goalInput').value) || 10;
+    document.getElementById('goalValue').textContent = repGoal;
     updateDisplay();
-    triggerFlash();
-    logEntry('MANUAL +' + n);
 }
 
-function resetAll() {
-    if (!confirm('Clear all session data?')) return;
-    count = 0;
-    saveSession();
-    updateDisplay();
-    logList.innerHTML = '';
+function checkGoal() {
+    if (count === repGoal) {
+        playAudio('goal');
+        alert("GOAL REACHED! Amazing work.");
+    }
 }
 
 function updateDisplay() {
     countDisplay.textContent = count;
     countDisplay.classList.remove('pop');
-    void countDisplay.offsetWidth; // Trigger reflow
+    void countDisplay.offsetWidth;
     countDisplay.classList.add('pop');
+    
+    const fill = document.getElementById('goalFill');
+    const pct = Math.min((count / repGoal) * 100, 100);
+    fill.style.width = pct + '%';
 }
 
 function triggerFlash() {
@@ -351,26 +298,17 @@ function logEntry(src) {
     logList.prepend(item);
 }
 
-// ═══════════════════════════════════════════════════════════
-//  UI HELPERS
-// ═══════════════════════════════════════════════════════════
 function setBadge(txt, cls) {
     stateBadge.textContent = txt;
     stateBadge.className = 'state-badge ' + cls;
 }
 
 function updateDebug(vals) {
-    const dbState = document.getElementById('dbState');
-    const dbWrist = document.getElementById('dbWrist');
-    const dbChin = document.getElementById('dbChin');
-    const dbPhase = document.getElementById('dbPhase');
-    const dbConf = document.getElementById('dbConf');
-
-    if (dbState) dbState.textContent = vals.state;
-    if (dbWrist) dbWrist.textContent = vals.wrist;
-    if (dbChin) dbChin.textContent = vals.chin;
-    if (dbPhase) dbPhase.textContent = vals.phase;
-    if (dbConf) dbConf.textContent = vals.conf;
+    txt('dbState', vals.state);
+    txt('dbWrist', vals.wrist);
+    txt('dbChin', vals.chin);
+    txt('dbPhase', vals.phase);
+    txt('dbConf', vals.conf);
 }
 
 function dot(id, cls) {
@@ -383,89 +321,54 @@ function txt(id, v) {
     if (el) el.textContent = v;
 }
 
-function setMode(m) {
-    mode = m;
-    const modeAuto = document.getElementById('modeAuto');
-    const modeManual = document.getElementById('modeManual');
-    const debugGrid = document.getElementById('debugGrid');
-
-    if (modeAuto) modeAuto.classList.toggle('active', m === 'auto');
-    if (modeManual) modeManual.classList.toggle('active', m === 'manual');
-    if (debugGrid) debugGrid.style.opacity = (m === 'auto' ? '1' : '0.3');
-}
-
-// ═══════════════════════════════════════════════════════════
-//  PERSISTENCE
-// ═══════════════════════════════════════════════════════════
-function saveSession() {
-    localStorage.setItem('pullup_count', count);
-}
-
+function saveSession() { localStorage.setItem('pullup_count', count); }
 function loadSession() {
     const stored = localStorage.getItem('pullup_count');
     if (stored) count = parseInt(stored);
 }
 
-// ═══════════════════════════════════════════════════════════
-//  AUDIO FEEDBACK
-// ═══════════════════════════════════════════════════════════
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-
 function playAudio(type) {
     if (audioCtx.state === 'suspended') audioCtx.resume();
-    
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
-    
     osc.connect(gain);
     gain.connect(audioCtx.destination);
-    
     if (type === 'rep') {
         osc.frequency.setValueAtTime(880, audioCtx.currentTime);
         osc.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.1);
         gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.1);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.1);
     } else if (type === 'top') {
         osc.frequency.setValueAtTime(660, audioCtx.currentTime);
         gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.05);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.05);
+    } else if (type === 'goal') {
+        osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); // C5
+        osc.frequency.exponentialRampToValueAtTime(1046.5, audioCtx.currentTime + 0.5); // C6
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.5);
     }
 }
 
-// ═══════════════════════════════════════════════════════════
-//  DRAWING
-// ═══════════════════════════════════════════════════════════
-const SKELETON = [
-    [5, 6], [5, 7], [7, 9], [6, 8], [8, 10], [5, 11], [6, 12], [11, 12]
-];
-
+const SKELETON = [[5, 6], [5, 7], [7, 9], [6, 8], [8, 10], [5, 11], [6, 12], [11, 12]];
 function drawPose(pose) {
     const kps = pose.keypoints;
     const MIN = 0.3;
-
-    // Draw lines
-    ctx.lineWidth = 3;
-    ctx.lineCap = 'round';
+    ctx.lineWidth = 3; ctx.lineCap = 'round';
     SKELETON.forEach(([a, b]) => {
         const ka = kps[a], kb = kps[b];
         if (ka.score > MIN && kb.score > MIN) {
-            ctx.beginPath();
-            ctx.strokeStyle = 'rgba(0, 207, 255, 0.6)';
-            ctx.moveTo(ka.x, ka.y);
-            ctx.lineTo(kb.x, kb.y);
-            ctx.stroke();
+            ctx.beginPath(); ctx.strokeStyle = 'rgba(0, 207, 255, 0.6)';
+            ctx.moveTo(ka.x, ka.y); ctx.lineTo(kb.x, kb.y); ctx.stroke();
         }
     });
-
-    // Draw dots
     kps.forEach(kp => {
         if (kp.score > MIN) {
-            ctx.beginPath();
-            ctx.arc(kp.x, kp.y, 4, 0, 2 * Math.PI);
+            ctx.beginPath(); ctx.arc(kp.x, kp.y, 4, 0, 2 * Math.PI);
             ctx.fillStyle = kp.name.includes('wrist') ? '#ff6b35' : '#00cfff';
             ctx.fill();
         }
@@ -473,10 +376,8 @@ function drawPose(pose) {
 }
 
 function closeTutorial() {
-    const tutorial = document.getElementById('tutorial');
-    if (tutorial) tutorial.classList.remove('active');
+    document.getElementById('tutorial').classList.remove('active');
     sessionStorage.setItem('pullup_tutorial_dismissed', 'true');
 }
 
-// Boot
 window.onload = init;
