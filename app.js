@@ -212,49 +212,50 @@ function handleNoPose() {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  PULL-UP LOGIC (STRICT BAR CROSS)
+//  PULL-UP LOGIC (RESILIENT BAR CROSS)
 // ═══════════════════════════════════════════════════════════
 function analyze(pose) {
     const kps = pose.keypoints;
-    const MIN_CONF = 0.35; // Stricter for accuracy
+    const MIN_CONF = 0.15; // Much more lenient for edge-of-screen tracking
     
     const nose = kps[0];
     const lWr = kps[9], rWr = kps[10];
 
-    // REQUIRE both hands and nose for strict tracking
-    const bothHandsVisible = lWr && rWr && lWr.score > MIN_CONF && rWr.score > MIN_CONF;
-    const noseVisible = nose && nose.score > MIN_CONF;
+    // Filter for visible keypoints
+    const isOk = (k) => k && k.score > MIN_CONF;
+    const okHands = [lWr, rWr].filter(isOk);
+    const hasNose = isOk(nose);
 
-    if (!bothHandsVisible || !noseVisible) {
+    // Guard: Need at least one hand and the nose to track
+    if (okHands.length === 0 || !hasNose) {
         handleNoPose();
-        setBadge('NEED BOTH HANDS', 'inactive');
+        if (!hasNose) setBadge('NEED FACE', 'inactive');
+        else setBadge('NEED HANDS', 'inactive');
         return;
     }
 
     const h = canvas.height;
-    // Find the HIGHER hand (the one with the smallest Y value)
-    // This is our "Bar Line"
-    const highestHandY = Math.min(lWr.y, rWr.y) / h;
+    
+    // BAR LOGIC: 
+    // Use the HIGHEST visible hand as the bar. 
+    // This handles both-hands-up AND one-hand-off-screen scenarios.
+    const highestHandY = Math.min(...okHands.map(k => k.y)) / h;
     const nNose = nose.y / h;
 
-    // ─── STRICT LOGIC ───
-    // Chin must go above the highest hand
+    // ─── RESILIENT LOGIC ───
     const isAbove = nNose < highestHandY; 
-    // Chin must drop clearly below the highest hand to reset
-    const isBelow = nNose > highestHandY + 0.03; 
+    const isBelow = nNose > highestHandY + 0.04; // Added small buffer for stability
 
     // ─── Debug ───
     updateDebug({
-        state: 'STRICT TRACKING',
+        state: okHands.length === 2 ? 'DUAL TRACK' : 'SINGLE FALLBACK',
         wrist: Math.round(highestHandY * h) + 'px',
         chin: Math.round(nNose * h) + 'px',
         phase: isAbove ? 'TOP' : 'BOTTOM',
-        conf: Math.round(Math.min(lWr.score, rWr.score, nose.score) * 100) + '%'
+        conf: Math.round(nose.score * 100) + '%'
     });
 
-    // ─── STRICT FSM ───
-    
-    // Step 1: Initialize at the bottom
+    // ─── FSM ───
     if (currentState === PS.NONE || currentState === PS.UP) {
         if (isBelow) {
             currentState = PS.HANGING;
@@ -263,7 +264,6 @@ function analyze(pose) {
         }
     }
 
-    // Step 2: Must cross the HIGHER hand line
     if (currentState === PS.HANGING) {
         if (isAbove) {
             playAudio('top'); 
@@ -273,7 +273,6 @@ function analyze(pose) {
         }
     }
 
-    // Step 3: Must drop back below the line to count
     if (currentState === PS.TOP) {
         if (isBelow && completedTop) {
             completeRep(); 
