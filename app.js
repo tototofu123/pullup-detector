@@ -221,32 +221,22 @@ function analyze(pose) {
         return;
     }
 
-    if (currentState === PS.NONE || currentState === PS.UP || currentState === PS.TOP) {
-        if (isFullReset) {
+    // ─── SIMPLE INSTANT FSM ───
+    
+    // Step 1: Initialize / Reset (When head is below the highest hand)
+    if (currentState === PS.NONE || currentState === PS.TOP) {
+        if (isBelow) {
             currentState = PS.HANGING;
-            completedTop = false;
-            setBadge('READY: FULL HANG', 'active');
+            setBadge('READY: BELOW BAR', 'active');
         }
     }
 
+    // Step 2: Count immediately on reaching the TOP
     if (currentState === PS.HANGING) {
         if (isAbove) {
-            playAudio('top'); 
+            completeRep(); // Count + Beep + Flash happens NOW
             currentState = PS.TOP;
-            completedTop = true;
             setBadge('REACHED TOP ✓', 'top');
-        }
-    }
-
-    if (currentState === PS.TOP) {
-        if (isPartialBelow && !isFullReset) {
-            setBadge('DROP LOWER ↓', 'active');
-        }
-        if (isFullReset && completedTop) {
-            completeRep(); 
-            currentState = PS.HANGING;
-            completedTop = false;
-            setBadge('READY: FULL HANG', 'active');
         }
     }
 }
