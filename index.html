@@ -67,7 +67,9 @@
                 <div class="dot" id="dotModel"></div>
                 <span id="txtModel">LOADING...</span>
             </div>
-            <div class="status-item" style="opacity: 0.4;">MOVENET LIGHTNING</div>
+            <div class="status-item" style="cursor: pointer; background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 4px;" onclick="clearAllData()">
+                <span>RESET SITE DATA</span>
+            </div>
         </div>
     </header>
 
@@ -88,7 +90,10 @@
             <!-- Start Overlay -->
             <div id="splash">
                 <div style="font-size: 48px; margin-bottom: 12px; opacity: 0.5;">🏋️</div>
-                <button class="btn-start" onclick="startCamera()">ACTIVATE CAMERA</button>
+                <button class="btn-start">ACTIVATE CAMERA</button>
+                <div id="permissionTroubleshoot" style="display: none; margin-top: 12px;">
+                    <button class="btn-secondary" onclick="showPermissionHelp()" style="font-size: 10px; padding: 4px 8px;">HOW TO UNBLOCK CAMERA?</button>
+                </div>
                 <p style="margin-top: 16px; font-size: 10px; opacity: 0.3; letter-spacing: 2px;">READY TO DETECT REPS</p>
             </div>
         </section>

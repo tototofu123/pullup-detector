@@ -14,7 +14,6 @@ let camLive = false;
 
 const PS = { NONE: 'NONE', HANGING: 'HANGING', TOP: 'TOP' };
 let currentState = PS.NONE;
-let completedTop = false;
 let lastRepTime = 0;
 
 const video = document.getElementById('video');
@@ -63,6 +62,7 @@ async function init() {
         setLoad(100, 'Ready!');
         dot('dotModel', 'on');
         txt('txtModel', 'MODEL READY');
+        checkCameraPermission();
         setTimeout(() => {
             const el = document.getElementById('loading');
             el.style.opacity = '0';
@@ -88,20 +88,33 @@ async function checkCameraPermission() {
 function handlePermissionChange(state) {
     const splashText = document.querySelector('#splash p');
     const startBtn = document.querySelector('.btn-start');
+    const troubleshoot = document.getElementById('permissionTroubleshoot');
+
     if (state === 'denied') {
-        splashText.textContent = 'CAMERA ACCESS BLOCKED. Please enable in browser settings.';
+        splashText.textContent = 'CAMERA ACCESS BLOCKED.';
         splashText.style.color = 'var(--danger)';
         splashText.style.opacity = '1';
-        startBtn.textContent = 'PERMISSIONS BLOCKED';
-        startBtn.style.opacity = '0.5';
-        startBtn.disabled = true;
+        startBtn.textContent = 'FIX PERMISSIONS';
+        startBtn.style.background = 'var(--danger)';
+        startBtn.onclick = showPermissionHelp;
+        if (troubleshoot) troubleshoot.style.display = 'block';
     } else if (state === 'prompt') {
         splashText.textContent = 'READY TO DETECT REPS';
         startBtn.textContent = 'ALLOW & START CAMERA';
+        startBtn.style.background = 'var(--accent)';
+        startBtn.onclick = startCamera;
+        if (troubleshoot) troubleshoot.style.display = 'none';
     } else if (state === 'granted') {
         splashText.textContent = 'PERMISSION GRANTED';
         startBtn.textContent = 'ACTIVATE CAMERA';
+        startBtn.style.background = 'var(--success)';
+        startBtn.onclick = startCamera;
+        if (troubleshoot) troubleshoot.style.display = 'none';
     }
+}
+
+function showPermissionHelp() {
+    alert("HOW TO RESET CAMERA PERMISSIONS:\n\n1. Look at the browser address bar (where the URL is).\n2. Click the 'Lock' or 'Camera' icon (usually on the left).\n3. Change 'Camera' from 'Block' to 'Allow' (or click 'Reset Permission').\n4. Refresh the page.\n\nAlternatively, click 'RESET SITE DATA' in the header to clear all app cookies.");
 }
 
 function setLoad(pct, msg) {
@@ -245,7 +258,6 @@ function resetAll() {
     updateDisplay();
     if (logList) logList.innerHTML = '';
     currentState = PS.NONE;
-    completedTop = false;
     setBadge('SESSION RESET', 'inactive');
 }
 
