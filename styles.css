@@ -1,0 +1,523 @@
+/* ── Reset & Tokens ───────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=Barlow:wght@300;400;500;600;700&display=swap');
+
+*,
+*::before,
+*::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --bg: #0a0a0c;
+    --surface: #141417;
+    --surface-hi: #1c1c21;
+    --border: #26262b;
+    --border-hi: #3a3a42;
+    --accent: #00cfff; /* Electric Blue */
+    --accent-alt: #ff6b35; /* Energetic Orange */
+    --accent-lo: rgba(0, 207, 255, .12);
+    --danger: #ff3c00;
+    --text: #e8e8ec;
+    --muted: #6e6e7c;
+    --font-display: 'Barlow Condensed', sans-serif;
+    --font-body: 'Barlow', sans-serif;
+}
+
+body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    height: 100svh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* ── Header ───────────────────────────────────────────── */
+header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+    z-index: 10;
+}
+
+.logo {
+    font-family: var(--font-display);
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: var(--accent);
+    text-transform: uppercase;
+}
+
+.status-row {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+.status-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: background .3s, box-shadow .3s;
+}
+
+.dot.on {
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+}
+
+.dot.blink {
+    animation: blink 2s infinite;
+}
+
+@keyframes blink {
+    0%, 100% { opacity: 1 }
+    50% { opacity: .4 }
+}
+
+/* ── Main Bento Layout ────────────────────────────────── */
+.main {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    flex: 1;
+    overflow: hidden;
+    padding: 16px;
+    gap: 16px;
+}
+
+@media (max-width: 900px) {
+    .main {
+        grid-template-columns: 1fr;
+        grid-template-rows: 1fr auto;
+        overflow-y: auto;
+    }
+}
+
+/* ── Camera Panel ─────────────────────────────────────── */
+.cam-container {
+    position: relative;
+    background: #000;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#video {
+    display: none;
+}
+
+#canvas {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.cam-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 20px;
+}
+
+.cam-label {
+    align-self: flex-start;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    background: rgba(0, 0, 0, .5);
+    padding: 4px 12px;
+    border-radius: 4px;
+    text-transform: uppercase;
+}
+
+.state-badge {
+    align-self: center;
+    font-family: var(--font-display);
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    padding: 8px 24px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, .8);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    text-transform: uppercase;
+    transition: all .2s;
+}
+
+.state-badge.active {
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: 0 0 20px rgba(0, 207, 255, .2);
+}
+
+.state-badge.top {
+    border-color: var(--accent-alt);
+    color: var(--accent-alt);
+    box-shadow: 0 0 30px rgba(255, 107, 53, .4);
+    transform: scale(1.1);
+}
+
+/* Start Screen */
+#splash {
+    position: absolute;
+    inset: 0;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 5;
+}
+
+.btn-start {
+    font-family: var(--font-display);
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: #000;
+    background: var(--accent);
+    border: none;
+    padding: 12px 40px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all .2s;
+    text-transform: uppercase;
+}
+
+.btn-start:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 207, 255, .4);
+}
+
+/* ── Dashboard (Bento Grid Sidebar) ───────────────────── */
+.dashboard {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    overflow-y: auto;
+}
+
+.bento-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+}
+
+/* Counter Card */
+.counter-card {
+    text-align: center;
+    background: linear-gradient(135deg, var(--surface) 0%, var(--bg) 100%);
+    border-color: var(--border-hi);
+}
+
+.counter-label {
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+}
+
+.counter-value {
+    font-family: var(--font-display);
+    font-size: 100px;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--accent);
+    margin: 10px 0;
+    display: block;
+}
+
+.counter-value.pop {
+    animation: pop .2s ease-out;
+}
+
+@keyframes pop {
+    0% { transform: scale(1.2) }
+    100% { transform: scale(1) }
+}
+
+/* Controls Card */
+.card-title {
+    font-family: var(--font-display);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    color: var(--text);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    display: flex;
+    justify-content: space-between;
+}
+
+.mode-toggle {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    background: var(--bg);
+    padding: 4px;
+    border-radius: 8px;
+    gap: 4px;
+}
+
+.mode-btn {
+    padding: 8px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--muted);
+    font-family: var(--font-body);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .2s;
+}
+
+.mode-btn.active {
+    background: var(--surface-hi);
+    color: var(--accent);
+}
+
+/* Debug Info */
+.debug-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+.debug-item {
+    background: var(--bg);
+    padding: 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+}
+
+.debug-label {
+    font-size: 9px;
+    color: var(--muted);
+    text-transform: uppercase;
+    display: block;
+}
+
+.debug-val {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+/* Log Card */
+.log-card {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 200px;
+}
+
+.log-list {
+    flex: 1;
+    overflow-y: auto;
+    margin-top: 10px;
+}
+
+.log-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    animation: slideIn .2s ease-out;
+}
+
+@keyframes slideIn {
+    from { opacity: 0; transform: translateX(10px) }
+    to { opacity: 1; transform: translateX(0) }
+}
+
+.log-item .rep { color: var(--accent); font-weight: 700; }
+.log-item .time { color: var(--muted); }
+
+/* Buttons */
+.btn-secondary {
+    width: 100%;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface-hi);
+    color: var(--text);
+    font-family: var(--font-display);
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: all .2s;
+}
+
+.btn-secondary:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.btn-danger {
+    color: var(--danger);
+}
+
+.btn-danger:hover {
+    background: var(--danger);
+    color: #fff;
+    border-color: var(--danger);
+}
+
+/* Loading Overlay */
+#loading {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: opacity .5s;
+}
+
+.loader-bar {
+    width: 200px;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin-top: 20px;
+    overflow: hidden;
+}
+
+.loader-fill {
+    height: 100%;
+    background: var(--accent);
+    width: 0%;
+    transition: width .3s;
+}
+
+/* ── Modal & Tutorial ────────────────────────────────── */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .85);
+    backdrop-filter: blur(8px);
+    z-index: 150;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: all .4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.modal-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.modal-card {
+    background: var(--surface);
+    border: 1px solid var(--border-hi);
+    border-radius: 16px;
+    padding: 32px;
+    max-width: 440px;
+    width: 90%;
+    transform: translateY(20px);
+    transition: transform .4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.modal-overlay.active .modal-card {
+    transform: translateY(0);
+}
+
+.tutorial-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    margin-top: 24px;
+}
+
+.step {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+}
+
+.step-num {
+    background: var(--surface-hi);
+    color: var(--accent);
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 14px;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.step p {
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text);
+}
+
+.step strong {
+    color: var(--accent);
+}
+
+/* Flash Effect */
+#flash {
+    position: fixed;
+    inset: 0;
+    background: var(--accent);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 90;
+}
+
+#flash.active {
+    animation: flashAnim .2s ease-out;
+}
+
+@keyframes flashAnim {
+    0% { opacity: .2 }
+    100% { opacity: 0 }
+}
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 10px; }
