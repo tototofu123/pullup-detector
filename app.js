@@ -1,6 +1,6 @@
 /**
  * PULL-UP COUNTER
- * Core logic with Pose Detection (MoveNet)
+ * Core logic with Pose Detection (MoveNet) - SIMPLE VERSION
  */
 
 // ═══════════════════════════════════════════════════════════
@@ -167,76 +167,67 @@ function handleNoPose() {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  PULL-UP LOGIC (STRICT ANATOMICAL ANTI-CHEAT)
+//  PULL-UP LOGIC (REVERTED SIMPLE BAR CROSS)
 // ═══════════════════════════════════════════════════════════
 function analyze(pose) {
     const kps = pose.keypoints;
-    const MIN_CONF = 0.20;
-    const ROM_THRESHOLD = 0.07; // Reduced from 0.12 for better sensitivity
+    const MIN_CONF = 0.15; 
     
     const nose = kps[0];
-    const lSh = kps[5], rSh = kps[6];
     const lWr = kps[9], rWr = kps[10];
 
     const isOk = (k) => k && k.score > MIN_CONF;
     const okHands = [lWr, rWr].filter(isOk);
-    const okShoulders = [lSh, rSh].filter(isOk);
     const hasNose = isOk(nose);
 
-    if (okHands.length === 0 || okShoulders.length === 0 || !hasNose) {
+    // Only need nose and at least one hand
+    if (okHands.length === 0 || !hasNose) {
         handleNoPose();
         return;
     }
 
     const h = canvas.height;
+    // Use the highest visible hand as the bar level
     const highestHandY = Math.min(...okHands.map(k => k.y)) / h;
-    const avgShoulderY = okShoulders.reduce((s, k) => s + k.y, 0) / okShoulders.length / h;
     const nNose = nose.y / h;
 
-    // Anatomical Check: Wrists must be near or above shoulders
-    // Increased buffer to 0.30 to handle steep camera angles or close-ups
-    const isHangingPos = highestHandY < avgShoulderY + 0.30; 
-    
     const isAbove = nNose < highestHandY; 
-    const isFullReset = nNose > highestHandY + ROM_THRESHOLD; 
-    const isPartialBelow = nNose > highestHandY + 0.02;
+    const isBelow = nNose > highestHandY + 0.02; // Small buffer for stability
 
     updateDebug({
-        state: isHangingPos ? 'VALID POSE' : 'INVALID POSE',
+        state: 'SIMPLE TRACKING',
         wrist: Math.round(highestHandY * h) + 'px',
         chin: Math.round(nNose * h) + 'px',
-        phase: !isHangingPos ? 'HANDS TOO LOW' : (isAbove ? 'TOP' : (isFullReset ? 'FULL HANG' : 'SHORT ROM')),
+        phase: isAbove ? 'TOP' : 'BOTTOM',
         conf: Math.round(nose.score * 100) + '%'
     });
 
-    if (!isHangingPos) {
-        // Only reset if hands are REALLY low (like at the waist)
-        if (currentState !== PS.NONE && highestHandY > 0.7) { 
-            currentState = PS.NONE;
-            completedTop = false;
-            setBadge('HANDS TOO LOW', 'inactive');
-        }
-        // If they are just slightly low, we stay in the last state but warn them
-        if (highestHandY > 0.6) setBadge('RAISE HANDS HIGHER', 'inactive');
-        return;
-    }
-
-    // ─── SIMPLE INSTANT FSM ───
-    
-    // Step 1: Initialize / Reset (When head is below the highest hand)
+    // Step 1: READY (Head is below bar)
     if (currentState === PS.NONE || currentState === PS.TOP) {
         if (isBelow) {
             currentState = PS.HANGING;
+            completedTop = false;
             setBadge('READY: BELOW BAR', 'active');
         }
     }
 
-    // Step 2: Count immediately on reaching the TOP
+    // Step 2: REACHED TOP (Head crosses above bar)
     if (currentState === PS.HANGING) {
         if (isAbove) {
-            completeRep(); // Count + Beep + Flash happens NOW
+            playAudio('top'); 
             currentState = PS.TOP;
+            completedTop = true;
             setBadge('REACHED TOP ✓', 'top');
+        }
+    }
+
+    // Step 3: COUNT (Head drops back below bar)
+    if (currentState === PS.TOP) {
+        if (isBelow && completedTop) {
+            completeRep(); 
+            currentState = PS.HANGING;
+            completedTop = false;
+            setBadge('READY: BELOW BAR', 'active');
         }
     }
 }
@@ -274,14 +265,18 @@ function updateDisplay() {
     countDisplay.classList.add('pop');
     
     const fill = document.getElementById('goalFill');
-    const pct = Math.min((count / repGoal) * 100, 100);
-    fill.style.width = pct + '%';
+    if (fill) {
+        const pct = Math.min((count / repGoal) * 100, 100);
+        fill.style.width = pct + '%';
+    }
 }
 
 function triggerFlash() {
     const fl = document.getElementById('flash');
-    fl.classList.add('active');
-    setTimeout(() => fl.classList.remove('active'), 200);
+    if (fl) {
+        fl.classList.add('active');
+        setTimeout(() => fl.classList.remove('active'), 200);
+    }
 }
 
 function logEntry(src) {
@@ -340,8 +335,8 @@ function playAudio(type) {
         gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
         osc.start(); osc.stop(audioCtx.currentTime + 0.05);
     } else if (type === 'goal') {
-        osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); // C5
-        osc.frequency.exponentialRampToValueAtTime(1046.5, audioCtx.currentTime + 0.5); // C6
+        osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); 
+        osc.frequency.exponentialRampToValueAtTime(1046.5, audioCtx.currentTime + 0.5); 
         gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
         osc.start(); osc.stop(audioCtx.currentTime + 0.5);
