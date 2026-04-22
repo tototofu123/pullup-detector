@@ -1,5 +1,7 @@
 # PULL·UP COUNTER — AI Trainer
 
+> 📖 **Full documentation is available in the [project wiki](docs/wiki/Home.md).**
+
 An AI-powered pull-up counter that runs entirely in the browser. It uses your webcam and TensorFlow.js MoveNet pose detection to automatically count reps in real time — no app install, no server, no wearables required.
 
 ---
